@@ -1,0 +1,93 @@
+name: Publish mystery game site and host dashboard
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Choose whether the site should be live
+        required: true
+        type: choice
+        options:
+          - publish
+          - unpublish
+        default: publish
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out the publisher repository
+        uses: actions/checkout@v4
+
+      - name: Check out private game content
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.GAME_CONTENT_REPO }}
+          ref: main
+          token: ${{ secrets.GAME_CONTENTS_READ_TOKEN }}
+          path: game-content
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the PDF renderer
+        if: inputs.action == 'publish'
+        run: python -m pip install pymupdf
+
+      - name: Install presentation converter when needed
+        if: inputs.action == 'publish'
+        run: |
+          if find game-content/games -type f \( -iname '*.pptx' -o -iname '*.ppsx' -o -iname '*.odp' \) -print -quit | grep -q .; then
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends -y libreoffice-impress
+          fi
+
+      - name: Generate the website
+        if: inputs.action == 'publish'
+        run: python build_game_site.py --games-dir game-content/games --output-dir site
+
+      - name: Replace the live site with an unpublished notice
+        if: inputs.action == 'unpublish'
+        run: |
+          rm -rf site
+          mkdir -p site
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Temporarily unavailable</title></head>
+          <body><main><h1>This game site is temporarily unavailable.</h1></main></body>
+          </html>
+          HTML
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the generated site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+          retention-days: 1
+
+      - name: Publish the site
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Show the organizer dashboard URL
+        if: inputs.action == 'publish'
+        run: |
+          echo "Organizer dashboard: ${{ steps.deployment.outputs.page_url }}host/" >> "$GITHUB_STEP_SUMMARY"
+          echo "Each game has a team dashboard at host/<game-slug>/. Team links open isolated station pages." >> "$GITHUB_STEP_SUMMARY"
