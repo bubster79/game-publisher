@@ -51,31 +51,47 @@ Copy each name exactly as its game folder appears inside `games`. Blank lines an
 
 Creating a new game folder does not make it public. To publish it, edit the existing `published-games.txt`, add its exact folder name on a new line, commit the change, then run **Publish**. To take just one game offline, edit the same file, remove that game's line, and run **Publish** again. Other listed games stay online. The **Unpublish** action takes all games offline.
 
-## Add a YouTube video to a page
+## Add a YouTube link to a game page
 
-You can add a YouTube video to a page that already has a PDF, or make a video-only page. A video-only page needs no PDF and displays the video without a PDF image underneath it.
+Add a numbered `.txt` file in the game's `media` folder and put the YouTube link in it. The website will display the video on that game page.
 
-If you are changing an existing page to video-only, remove its PDF from that game's `pdfs` folder (or move it outside the game folder). Keep the numbered `.txt` file in `media`. If the matching PDF stays in `pdfs`, the website will continue to show it on that page.
-
-1. From the game content repository home page, create the media folder by choosing **Add file → Create new file** and entering:
-
-   `games/dead-weight-mini-mystery/media/README.txt`
-
-   Type a short note and select **Commit changes**. If you are already inside the game folder, you can instead create `media/README.txt` there.
-
-2. Open the new `media` folder. Choose **Add file → Create new file**. For a video-only page, use a numbered filename such as:
-
-   `005_Case_Introduction.txt`
-
-3. In that file, add the YouTube link like this, then select **Commit changes**:
+1. In the private game content repository, open the game's folder and choose **Add file → Create new file**. Enter `media/005_Case_Introduction.txt` as the filename. If the `media` folder does not exist yet, GitHub creates it as part of this step.
+2. In the file, add the YouTube link in this format:
 
    `youtube=https://youtu.be/VIDEO_ID`
 
-   Replace the example link with the video’s share link. The three-digit number controls where the page appears in the game. For example, `005_` puts it before `010_` pages. Commit the file and publish to add the video-only page.
+   Replace the example URL with the video's share link. You can also use a link like `youtube=https://www.youtube.com/watch?v=VIDEO_ID`.
 
-To put the video on a page that already has a PDF, name the text file to match the PDF instead. For `010_Case_Introduction.pdf`, use `010_Case_Introduction.txt`.
+3. Select **Commit changes**, then run the **Publish** workflow in the game publisher repository.
 
-You can use either `youtube=https://youtu.be/VIDEO_ID` or `youtube=https://www.youtube.com/watch?v=VIDEO_ID` in the text file.
+The three-digit number controls where the page appears in the game. For example, `005_` puts the video page before `010_` pages. To show a video on a page that already has a PDF, use the same number and name as the PDF. For `010_Case_Introduction.pdf`, name the text file `010_Case_Introduction.txt`.
+
+For a video-only page, do not keep a matching PDF in the game's `pdfs` folder. If changing an existing page to video-only, remove its PDF or move it outside the game folder.
+
+## Add an emoji feedback question to a station
+
+Create a text file in the game's `surveys` folder. Use the same filename stem as the PDF or station page. For example, for `pdfs/010_Case_Introduction.pdf`, create `surveys/010_Case_Introduction.txt` with:
+
+```text
+question=How did your team find this clue?
+options=😞|Difficult;😐|Okay;🙂|Good;🤩|Excellent
+```
+
+The `question=` line is required. The `options=` line is optional; if you leave it out, the site uses four default emoji choices. The question appears on that station page. The team's answer is saved when they select an emoji and click **Done**.
+
+## Connect the dashboard to Google Sheets
+
+This one-time setup lets the host see team progress and survey answers from other devices and email a summary when the game ends.
+
+1. Create a Google Sheet for game responses. Copy the ID from its web address (the part between `/d/` and `/edit`).
+2. Open the `apps-script/Code.gs` file in this repository, copy its contents, and create a project at [script.google.com](https://script.google.com). Paste the code into `Code.gs`.
+3. In the Apps Script project, open **Project Settings** and add these **Script Properties**: `SPREADSHEET_ID` (the Sheet ID), `HOST_EMAIL` (where summaries should be sent), and `HOST_PIN` (a private PIN the host enters before sending a summary).
+4. Return to the script editor, choose `setupMysterySheets` from the function menu, and click **Run** once. Then run `authorizeMysteryEmail` once. Approve Google's access prompts. The first function creates the tabs used to store teams and responses; the second authorizes the email feature.
+5. Choose **Deploy → New deployment → Web app**. Set **Execute as** to your account and allow access to **Anyone**. Deploy, then copy the web app URL ending in `/exec`.
+6. In the **game publisher repository**, open **Settings → Secrets and variables → Actions → Variables**. Add a repository variable named `APPS_SCRIPT_URL` and paste the web app URL as its value.
+7. Run the **Publish** workflow again. The generated station pages and host dashboard will now use Google Sheets.
+
+Keep the host PIN private. The host dashboard asks for it when sending the email summary. Each game session's dashboard link contains a unique session key; keep that link with the organizer. Apps Script source is stored in this repository for future maintainers, but its live deployment is managed in Google Apps Script.
 
 ## Publish the game websites
 
@@ -107,8 +123,8 @@ The public address will show an unavailable notice. To make the games public aga
 
 From the host hub, open a game's host dashboard. Name the first team and click stations in that team's visit order. **Initiate game** saves the team and station order in the browser and opens the monitoring dashboard in a new tab.
 
-On the monitoring dashboard, use **Add new team** to give another team its own name and station order. Assign a station when the team is ready for it, then mark it complete when they report back. The dashboard shows completed, current, and next stations. Share a station link by email or use **Copy link**.
+On the monitoring dashboard, use **Add new team** to give another team its own name and station order. Assign a station when the team is ready for it, then share the link using **Copy link** or email. When players select feedback and click **Done**, their progress and answer appear in the host dashboard. The dashboard checks for updates every five seconds. At the end, choose **Email survey responses** and enter the host PIN to email the team responses.
 
-Team names and progress are saved in the browser's local storage. Keep using the same browser and device during the game; clearing browser data or switching devices will not carry the saved progress across.
+The browser keeps a local copy of the setup. With Google Sheets connected, team progress and responses are also stored online, so the host dashboard can refresh them across devices. Without the Apps Script URL configured, progress stays in that browser and cannot receive players' updates from another device.
 
 Station links open one page without the game's menu or previous/next controls. The site is public static hosting, so a station link does not prevent someone from manually opening another public game URL. Do not use it to protect confidential material.
